@@ -125,10 +125,12 @@ Binary cross-entropy loss, RMSprop (lr 1e-3), early stopping on validation loss 
 
 | Model | train acc | validation acc | test acc |
 |---|---|---|---|
-| From scratch (CNN + augmentation) | 76.7 % | 71.0 % | **70.5 %** |
-| Pretrained VGG16 (frozen base + new head) | 100 % | 93.0 % | **96.0 %** |
+| From scratch (CNN + augmentation) | 61.7 % | 60.0 % | **62.5 %** |
+| Pretrained VGG16 - A: cached features + new head | 100 % | 93.0 % | **96.0 %** |
+| Pretrained VGG16 - B: end-to-end with data augmentation | 99.3 % | 96.0 % | **96.5 %** |
 
-The pretrained model is about **25 percentage points** better on the held-out test set.
+Both pretrained variants are over **30 percentage points** better than the scratch CNN on the held-out test set.
+Variant B feeds every image through `DataAug` and the frozen VGG16 base each epoch (slower on a CPU); the extra gain over A is small.
 Exact numbers vary slightly between machines and library versions (random initialisation); the conclusion does not.
 
 ### 3.7 Discussion
@@ -242,6 +244,5 @@ A single run per model is noisy (the scratch CNN scored 62-70 % on different mac
 ## 7. Design notes and limitations
 * Seeds are fixed (`config.SEED = 42`) for reproducibility on the same setup.
 * The "limited" dataset is deliberately tiny (300 training images) to show the effect of transfer learning.
-* The pretrained model is trained as feature extraction without augmentation and without fine-tuning; adding
-  both is a natural extension.
+* Pretrained variant A is plain feature extraction; variant B adds data augmentation. Fine-tuning is explored in the bonus analysis.
 * Test images are never used for training, early stopping or model selection.
