@@ -34,23 +34,24 @@ def plot_history(history, title, save_path=None):
 class CatsDogsLimit:
     """Cat/dog classifier trained FROM SCRATCH on the limited dataset (with data augmentation)."""
 
-    def __init__(self, data_dir="limited_data", epochs=40, augment=True):
+    def __init__(self, data_dir="limited_data", epochs=40, augment=True, seed=C.SEED, patience=10):
         self.data_dir, self.epochs, self.augment = data_dir, epochs, augment
+        self.seed, self.patience = seed, patience
         self.model = self.history = None
         self.train_ds = self.val_ds = self.test_ds = None
 
     def load_data(self):
-        self.train_ds = load_split(self.data_dir, "train", True)
+        self.train_ds = load_split(self.data_dir, "train", True, self.seed)
         self.val_ds = load_split(self.data_dir, "validation", False)
         self.test_ds = load_split(self.data_dir, "test", False)
         return self
 
     def build_model(self):
-        keras.utils.set_random_seed(C.SEED)
+        keras.utils.set_random_seed(self.seed)
         inputs = keras.Input(shape=C.IMG_SIZE + (3,))
         x = layers.Rescaling(1. / 255)(inputs)
         if self.augment:
-            x = DataAug().get_layer()(x)
+            x = DataAug(self.seed).get_layer()(x)
         for f in (32, 64, 128, 128):
             x = layers.Conv2D(f, 3, activation="relu")(x)
             x = layers.MaxPooling2D(2)(x)
@@ -64,7 +65,7 @@ class CatsDogsLimit:
         return self.model
 
     def train(self, verbose=2):
-        cb = [keras.callbacks.EarlyStopping(monitor="val_loss", patience=10, restore_best_weights=True)]
+        cb = [keras.callbacks.EarlyStopping(monitor="val_loss", patience=self.patience, restore_best_weights=True)]
         self.history = self.model.fit(self.train_ds, validation_data=self.val_ds,
                                       epochs=self.epochs, callbacks=cb, verbose=verbose)
         return self.history
@@ -75,6 +76,12 @@ class CatsDogsLimit:
             loss, acc = self.model.evaluate(ds, verbose=0)
             res[name] = {"loss": float(loss), "accuracy": float(acc)}
         return res
+
+    def predict_test(self):
+        """Test-set probabilities, true labels and file paths (fixed order)."""
+        probs = self.model.predict(self.test_ds, verbose=0).ravel()
+        labels = np.concatenate([y.numpy().ravel() for _, y in self.test_ds])
+        return probs, labels, list(self.test_ds.file_paths)
 
     def plot_history(self, save_path=None):
         plot_history(self.history, "Scratch CNN (limited data)", save_path)
