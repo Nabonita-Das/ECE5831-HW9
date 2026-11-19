@@ -1,0 +1,19 @@
+# data and weights are downloaded automatically (see README)
+data/
+limited_data/
+_raw_*/
+*.h5
+*.keras
+
+# python / jupyter
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.pytest_cache/
+.venv/
+venv/
+
+# editors / OS
+.vscode/
+.idea/
+.DS_Store
