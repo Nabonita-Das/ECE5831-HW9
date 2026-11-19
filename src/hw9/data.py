@@ -92,8 +92,8 @@ def prepare_limited_dataset(base="limited_data", raw_dir="data", seed=C.SEED, us
     return base
 
 
-def load_split(base, split, shuffle):
+def load_split(base, split, shuffle, seed=C.SEED):
     """tf.data pipeline for one split (binary labels: cats=0, dogs=1)."""
     return keras.utils.image_dataset_from_directory(
         f"{base}/{split}", image_size=C.IMG_SIZE, batch_size=C.BATCH,
-        label_mode="binary", shuffle=shuffle, seed=C.SEED)
+        label_mode="binary", shuffle=shuffle, seed=seed)
