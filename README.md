@@ -1,5 +1,7 @@
 # ECE-5831 HW#9 - Data Augmentation, Transfer Learning and Text Processing
 
+[![tests](https://github.com/Nabonita-Das/ECE5831-HW9/actions/workflows/tests.yml/badge.svg)](https://github.com/Nabonita-Das/ECE5831-HW9/actions/workflows/tests.yml)
+
 This repository contains my solution to HW#9. It has two parts:
 
 | Part | Topic | Deliverable |
@@ -8,7 +10,9 @@ This repository contains my solution to HW#9. It has two parts:
 | 2 | Text processing: encoding text into numbers and decoding it back | `Module_9_2.ipynb` |
 
 The two notebooks are the graded deliverables (all cells executed, outputs and markdown included).
-The same code is also available as a small, tested Python package in `src/hw9`, with two command-line scripts.
+The same code is also available as a small, tested Python package in `src/hw9`, with command-line scripts.
+Two **optional bonus notebooks** go further (multi-seed statistics, augmentation ablation, fine-tuning, a second backbone,
+error analysis; and more text representations) - see section 5.
 
 ---
 
@@ -16,20 +20,26 @@ The same code is also available as a small, tested Python package in `src/hw9`, 
 
 ```
 .
-├── Module_9_1.ipynb          # Part 1 deliverable (executed, with outputs)
-├── Module_9_2.ipynb          # Part 2 deliverable (executed, with outputs)
-├── run_part1.py              # Part 1 as a script: augmentation -> scratch CNN -> VGG16 -> comparison
-├── run_part2.py              # Part 2 as a script: text -> numbers -> text demo
+├── Module_9_1.ipynb            # Part 1 deliverable (executed, with outputs)
+├── Module_9_2.ipynb            # Part 2 deliverable (executed, with outputs)
+├── Bonus_Part1_Analysis.ipynb  # optional: deeper analysis of Part 1 (executed)
+├── Bonus_Part2_Text_Extras.ipynb  # optional: more text representations (executed)
+├── run_part1.py                # Part 1 as a script: augmentation -> scratch CNN -> VGG16 -> comparison
+├── run_part2.py                # Part 2 as a script: text -> numbers -> text demo
+├── run_bonus.py                # bonus experiments (seeds, sizes, fine-tuning, ResNet50, error analysis)
 ├── src/hw9/
-│   ├── config.py             # all constants (image size, split sizes, URLs, seed)
-│   ├── data.py               # builds the limited train/validation/test dataset
-│   ├── augmentation.py       # class DataAug
-│   ├── models.py             # classes CatsDogsLimit and CatsDogsPre
-│   └── text_process.py       # class TextProcess
-├── tests/                    # pytest unit tests (19 tests)
-├── requirements.txt
-├── pyproject.toml
-└── .gitignore
+│   ├── config.py               # all constants (image size, split sizes, URLs, seed)
+│   ├── data.py                 # builds the limited train/validation/test dataset
+│   ├── augmentation.py         # class DataAug
+│   ├── models.py               # classes CatsDogsLimit and CatsDogsPre
+│   ├── text_process.py         # class TextProcess
+│   ├── experiments.py          # bonus experiments, metrics and plots
+│   └── text_extras.py          # TF-IDF, hashing trick, BPE, embedding classifier
+├── tests/                      # pytest unit tests (27 tests)
+├── bonus_results/              # cached results of the bonus experiments (json + test predictions)
+├── docs/images/                # figures used in this README
+├── .github/workflows/tests.yml # continuous integration (pytest on every push)
+├── requirements.txt, pyproject.toml, .gitignore, LICENSE
 ```
 
 ## 2. Quick start
@@ -42,6 +52,7 @@ pip install -r requirements.txt
 pytest                               # unit tests (a few seconds)
 python run_part2.py                  # Part 2 demo
 python run_part1.py                  # Part 1 (a few minutes on CPU, downloads data on first run)
+python run_bonus.py                  # bonus experiments (about 40 minutes on CPU, results are cached)
 jupyter notebook                     # or open the notebooks in VS Code
 ```
 
@@ -131,6 +142,16 @@ Exact numbers vary slightly between machines and library versions (random initia
   way to get more out of a model that has to be trained from scratch. They can be combined (augmentation +
   fine-tuning the last VGG block) for further gains.
 
+### 3.8 Figures from the notebook run
+
+| Augmented images | Scratch CNN training curves |
+|---|---|
+| ![augmentation examples](docs/images/augmentation_examples.png) | ![scratch history](docs/images/scratch_history.png) |
+
+| Pretrained VGG16 training curves | Scratch vs. pretrained |
+|---|---|
+| ![pretrained history](docs/images/pretrained_history.png) | ![comparison](docs/images/comparison_notebook.png) |
+
 ---
 
 ## 4. Part 2 - text processing (`text_process.py`)
@@ -165,13 +186,60 @@ Properties (all covered by tests):
 
 ---
 
-## 5. Tests
+---
 
-`pytest` runs 19 tests:
+## 5. Bonus experiments (optional)
+
+### 5.1 Part 1 deep dive - `Bonus_Part1_Analysis.ipynb`
+A single run per model is noisy (the scratch CNN scored 62-70 % on different machines), so every model was repeated with
+**3 seeds** on the same limited data (`python run_bonus.py`, implemented in `src/hw9/experiments.py`).
+
+| Model (300 training images) | train acc | test acc (mean +/- std) | test F1 |
+|---|---|---|---|
+| Scratch CNN, no augmentation | 63.1 % | 58.8 % +/- 6.7 | 0.669 |
+| Scratch CNN + augmentation | 73.3 % | 67.5 % +/- 2.5 | 0.686 |
+| VGG16, frozen base | 100 % | 94.8 % +/- 0.8 | 0.948 |
+| VGG16, fine-tuned `block5` | 100 % | 89.3 % +/- 0.8 | 0.899 |
+| ResNet50, frozen base | 99.9 % | **96.3 % +/- 0.9** | 0.964 |
+
+![all models](docs/images/final_comparison.png)
+
+| Does augmentation help? | Effect of training-set size |
+|---|---|
+| ![ablation](docs/images/ablation.png) | ![size sweep](docs/images/size_sweep.png) |
+
+**Findings**
+1. **Augmentation helps a scratch model** (+8.7 points, and a much smaller spread between seeds), but cannot close the gap to pretrained models.
+2. **Transfer learning is stable and data-efficient:** the pretrained backbones already reach about 90-95 % with only 100 training images, while the scratch CNN stays near 58 % until 300 images.
+3. **Fine-tuning hurt (-5.5 points).** Unfreezing `block5` on 300 images over-fits (100 % training accuracy); frozen features were the safer choice.
+4. **ResNet50 beat VGG16 (+1.5 points)**, so the benefit is not specific to one backbone.
+5. **Error analysis:** the frozen VGG16 makes only 8 test errors (6 cats called dogs, 2 dogs called cats); the scratch CNN makes errors in both directions (28 + 34).
+   Its most confident mistakes are mostly dark/black cats and cluttered scenes (a person holding the cat, cage bars, text on the photo).
+
+![confusion matrices](docs/images/confusion_matrices.png)
+
+*Caveats:* 3 seeds per setting; a 200-image test set (one image = 0.5 percentage points); hyper-parameters were chosen once and not tuned per model.
+
+### 5.2 Part 2 extras - `Bonus_Part2_Text_Extras.ipynb` (`src/hw9/text_extras.py`)
+
+| Representation | Reversible? | Fixed size? | Unseen words |
+|---|---|---|---|
+| `TextProcess` ids (HW#9) | yes (up to lower-casing) | no | `<OOV>` |
+| `TextVectorizer`: bag-of-words / TF-IDF (+ n-grams) | no (order is lost) | yes | ignored |
+| `hash_encode`: hashing trick | **no** (collisions, no vocabulary) | yes | hashed anyway |
+| `BPE`: byte-pair-encoding subwords | yes | no | split into known pieces |
+| Embedding layer + small classifier (toy sentiment data) | - | - | needs ids first |
+
+---
+
+## 6. Tests
+
+`pytest` runs 27 tests (also executed by GitHub Actions on every push):
 * `tests/test_text_process.py` - vocabulary, encoding, decoding, padding, one-hot, OOV, char mode, JSON.
+* `tests/test_text_extras.py` - TF-IDF / count / binary vectors, n-grams, hashing, BPE round trip, toy classifier.
 * `tests/test_augmentation.py` - augmentation keeps the image shape, changes the pixels while training and is the identity at inference.
 
-## 6. Design notes and limitations
+## 7. Design notes and limitations
 * Seeds are fixed (`config.SEED = 42`) for reproducibility on the same setup.
 * The "limited" dataset is deliberately tiny (300 training images) to show the effect of transfer learning.
 * The pretrained model is trained as feature extraction without augmentation and without fine-tuning; adding
