@@ -125,11 +125,11 @@ Binary cross-entropy loss, RMSprop (lr 1e-3), early stopping on validation loss 
 
 | Model | train acc | validation acc | test acc |
 |---|---|---|---|
-| From scratch (CNN + augmentation) | 61.7 % | 60.0 % | **62.5 %** |
+| From scratch (CNN + augmentation) | 76.7 % | 71.0 % | **70.5 %** |
 | Pretrained VGG16 - A: cached features + new head | 100 % | 93.0 % | **96.0 %** |
 | Pretrained VGG16 - B: end-to-end with data augmentation | 99.3 % | 96.0 % | **96.5 %** |
 
-Both pretrained variants are over **30 percentage points** better than the scratch CNN on the held-out test set.
+Both pretrained variants are about **26 percentage points** better than the scratch CNN on the held-out test set.
 Variant B feeds every image through `DataAug` and the frozen VGG16 base each epoch (slower on a CPU); the extra gain over A is small.
 Exact numbers vary slightly between machines and library versions (random initialisation); the conclusion does not.
 
