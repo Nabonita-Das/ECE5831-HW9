@@ -1,5 +1,7 @@
 """Build the *limited* cats/dogs dataset on disk (train / validation / test)."""
+import contextlib
 import glob
+import io
 import os
 import random
 import shutil
@@ -21,7 +23,8 @@ def download(url, dest):
 
 
 def _pool_from_official():
-    zip_path = keras.utils.get_file("cats_and_dogs_filtered.zip", origin=C.OFFICIAL_URL, extract=True)
+    with contextlib.redirect_stdout(io.StringIO()):          # keep the output clean
+        zip_path = keras.utils.get_file("cats_and_dogs_filtered.zip", origin=C.OFFICIAL_URL, extract=True)
     root = os.path.join(os.path.dirname(zip_path), "cats_and_dogs_filtered")
     pool = {}
     for c in C.CLASSES:

@@ -1,4 +1,6 @@
 """CatsDogsLimit (CNN from scratch) and CatsDogsPre (pretrained VGG16) on the same limited data."""
+import contextlib
+import io
 import os
 
 import matplotlib.pyplot as plt
@@ -107,7 +109,8 @@ class CatsDogsPre:
     def load_pretrained_base(self):
         shape = C.IMG_SIZE + (3,)
         try:
-            self.base = keras.applications.VGG16(weights="imagenet", include_top=False, input_shape=shape)
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.base = keras.applications.VGG16(weights="imagenet", include_top=False, input_shape=shape)
             print("Loaded VGG16 ImageNet weights (Keras download).")
         except Exception:
             if not os.path.exists(self.weights_path):
@@ -156,6 +159,39 @@ class CatsDogsPre:
 
     def plot_history(self, save_path=None):
         plot_history(self.history, "Pretrained VGG16 + new head (limited data)", save_path)
+
+    # ---- Variant B: frozen VGG16 + DataAug, trained end-to-end on the images -------------------
+    def build_augmented_model(self):
+        """raw image -> DataAug (training only) -> VGG16 preprocessing -> frozen VGG16 base -> new head."""
+        keras.utils.set_random_seed(C.SEED)
+        inputs = keras.Input(shape=C.IMG_SIZE + (3,))
+        x = DataAug().get_layer()(inputs)
+        x = keras.applications.vgg16.preprocess_input(x)
+        x = self.base(x)
+        x = layers.Flatten()(x)
+        x = layers.Dense(256, activation="relu")(x)
+        x = layers.Dropout(0.5)(x)
+        outputs = layers.Dense(1, activation="sigmoid")(x)
+        self.aug_model = keras.Model(inputs, outputs, name="cats_dogs_pretrained_augmented")
+        self.aug_model.compile(loss="binary_crossentropy",
+                               optimizer=keras.optimizers.RMSprop(1e-4), metrics=["accuracy"])
+        return self.aug_model
+
+    def train_augmented(self, epochs=12, verbose=2):
+        self.aug_train_ds = load_split(self.data_dir, "train", True)
+        self.aug_val_ds = load_split(self.data_dir, "validation", False)
+        cb = [keras.callbacks.EarlyStopping(monitor="val_loss", patience=5, restore_best_weights=True)]
+        self.aug_history = self.aug_model.fit(self.aug_train_ds, validation_data=self.aug_val_ds,
+                                              epochs=epochs, callbacks=cb, verbose=verbose)
+        return self.aug_history
+
+    def evaluate_augmented(self):
+        res = {}
+        for name, ds in (("train", load_split(self.data_dir, "train", False)), ("validation", self.aug_val_ds),
+                         ("test", load_split(self.data_dir, "test", False))):
+            loss, acc = self.aug_model.evaluate(ds, verbose=0)
+            res[name] = {"loss": float(loss), "accuracy": float(acc)}
+        return res
 
     def build_full_model(self):
         """Assemble base + trained head into one end-to-end model that accepts raw images."""
