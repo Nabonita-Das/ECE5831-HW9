@@ -1,0 +1,10 @@
+[project]
+name = "ece5831-hw9"
+version = "1.0.0"
+description = "ECE-5831 HW#9: data augmentation, transfer learning and text processing"
+requires-python = ">=3.10"
+dependencies = ["tensorflow>=2.16", "numpy", "pandas", "matplotlib"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
